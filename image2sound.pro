@@ -28,14 +28,16 @@ SOURCES += \
         image2sound.cpp \
     extract_rgb.cpp \
     process_jpg.c \
-    rgb_to_midi.cpp
+    rgb_to_midi.cpp \
+    midi_files.cpp
 
 HEADERS += \
         image2sound.h \
     extract_rgb.h \
     process_jpg.h \
     jpeglib.h \
-    rgb_to_midi.h
+    rgb_to_midi.h \
+    midi_files.h
 
 LIBS += -ljpeg
 

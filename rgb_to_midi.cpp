@@ -7,12 +7,16 @@
 #define wait_next_activation(t, p) clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t, NULL); \
                               time_add_ms(&t, p);
 
+#define send_signal(thread_id)    pthread_mutex_lock(&image2sound::sync_mutex[thread_id]); \
+                                  image2sound::is_triggered[thread_id] = true; \
+                                  pthread_cond_signal(&image2sound::sync_cond[thread_id]); \
+                                  pthread_mutex_unlock(&image2sound::sync_mutex[thread_id]);
+
+void send_signal_to_thread(int next_column);
+
 #define MAX(x, y, z) x>y ? x>z ? x : z : y>z ? y : z
 #define MIN(x, y, z) x<y ? x<z ? x : z : y<z ? y : z
 
-void time_add_ms(struct timespec *t, int ms);
-int time_cmp(struct timespec t1, struct timespec t2);
-void check_deadline_miss(struct timespec t1);
 int convert_to_hsb (unsigned char *rgb_input, float *hsb_output, image_size *img_size);
 void process_rgb_to_midi(unsigned char *rgb_input, midi_data *output, image_size *img_size);
 int convert_to_midi(float *hsb_input, midi_data *midi_output);
@@ -33,9 +37,7 @@ void *rgb_to_midi(void *arg)
     //a buffer to copy the current rgb column
     unsigned char rgb_buffer[rgb_in_acolumn];
     midi_data midi_buffer[img_size->height];
-    std::vector<midi_data>::iterator it;
 
-    it = image2sound::midi_vector.begin();
     qDebug() << "RGB TO MIDI: image size is" << img_size->height << " " << rgb_in_acolumn<< endl;
     //start clock
     get_time(t_running);
@@ -50,7 +52,6 @@ void *rgb_to_midi(void *arg)
 
         if(!is_vector_full) {
             for(i = 0; i < img_size->height; i++)
-                //image2sound::midi_vector.insert(it, midi_buffer, midi_buffer + t_arg->img_size->height);
                 image2sound::midi_vector.push_back(midi_buffer[i]);
             }
         else
@@ -58,6 +59,11 @@ void *rgb_to_midi(void *arg)
                  midi_buffer[i] = image2sound::midi_vector[i + (img_size->height * next_column)];
 
         next_column += 1;
+        if(!image2sound::is_triggered[THREAD1] || !image2sound::is_triggered[THREAD2] ||
+                !image2sound::is_triggered[THREAD3] || !image2sound::is_triggered[THREAD4]){
+            send_signal_to_thread(next_column);
+            qDebug() << "MIDI about to send a signal" << endl;
+        }
 
         if(next_column == img_size->width) {
             next_column = 0;
@@ -67,7 +73,7 @@ void *rgb_to_midi(void *arg)
         //copy output midi to vector
         check_deadline_miss(t_running);
         wait_next_activation(t_running, period);
-        qDebug() << "RGB TO MIDI: woke up from sleep" << endl;
+        //qDebug() << "RGB TO MIDI: woke up from sleep" << endl;
     }
 
     //it should never reach here
@@ -106,11 +112,8 @@ int time_cmp(timespec t1, timespec t2)
 void process_rgb_to_midi(unsigned char *rgb_input, midi_data *output, image_size *img_size)
 {
     float hsb_buffer [img_size->height * 2];
-    //qDebug() << "INSIDE PROCESS RGB: entered process" <<endl;
     convert_to_hsb(rgb_input, hsb_buffer, img_size);
-    //qDebug() << "INSIDE PROCESS RGB: done converting to hsb" <<endl;
     convert_to_midi(hsb_buffer, output, img_size);
-    //qDebug() << "INSIDE PROCESS RGB: done converting to midi" <<endl;
 }
 
 int convert_to_hsb (unsigned char *rgb_input, float *hsb_output, image_size *img_size)
@@ -176,7 +179,7 @@ int convert_to_hsb (unsigned char *rgb_input, float *hsb_output, image_size *img
             hue = -2.0;
     //qDebug() << "INSIDE TO HSB: before writing " << i << " " << rgb_in_acolumn<< endl;
         *(hsb_output + j) = hue;
-        *(hsb_output + j + 1) = brightness * sat;
+        *(hsb_output + j + 1) = brightness;
     }
     //qDebug() << "INSIDE TO HSB: done converting to hsb " << i << endl;
     return 0;
@@ -231,10 +234,39 @@ int convert_to_midi(float *hsb_input, midi_data *midi_output, image_size *img_si
         else
             (midi_output + i)->note = (unsigned char) MIDI_14;
 
-        (midi_output + i)->volume = (unsigned char) luminousity * 127;
-    // qDebug() << "INSIDE TO MIDI: midi note " << hue << " "<< (midi_output + i)->note << " vol "
-      //        << (midi_output + i)->volume <<" " << luminousity << endl;
+        (midi_output + i)->volume = luminousity * 127;
+   // qDebug() << "INSIDE TO MIDI: midi note " << hue << " "<< (midi_output + i)->note << " vol "
+           //   << (midi_output + i)->volume <<" " << luminousity *127 << endl;
+        if((midi_output + i)->note == 0)
+           exit(0);
+
     }
     return 1;
 
+}
+
+void send_signal_to_thread(int next_column)
+{
+    int thread_id;
+    qDebug () << "getting inside signal" << endl;
+
+    if(!image2sound::is_triggered[THREAD1] && next_column == image2sound::trig_pts.thread_1_trig) {
+        thread_id = THREAD1;
+        send_signal(thread_id);
+    }
+
+    if(!image2sound::is_triggered[THREAD2] && next_column == image2sound::trig_pts.thread_2_trig) {
+        thread_id = THREAD2;
+        send_signal(thread_id);
+    }
+
+    if(!image2sound::is_triggered[THREAD3] && next_column == image2sound::trig_pts.thread_3_trig) {
+        thread_id = THREAD3;
+        send_signal(thread_id);
+    }
+
+    if(!image2sound::is_triggered[THREAD4] && next_column == image2sound::trig_pts.thread_4_trig) {
+        thread_id = THREAD4;
+        send_signal(thread_id);
+    }
 }

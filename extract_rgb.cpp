@@ -16,9 +16,10 @@ void *extract_rgb(void *arg)
     unsigned int i, k = 0;
     int j;
 
-    image_info *img_info = (image_info *) arg;
+    thread_arg *th_arg = (thread_arg *) arg;
 
-    QString filename = *((QString *) img_info->filename);
+    //*img_info = (image_info *) arg;
+    QString filename = *((QString *) th_arg->extra_params);
     QByteArray ba = filename.toLatin1();
 
     char fname [ba.size() + 1];
@@ -30,7 +31,7 @@ void *extract_rgb(void *arg)
     qDebug() << "EXTRACT RGB: fname is" << fname << endl;
 
     get_image_size(fname, &img_size);
-    *(img_info->img_size) = img_size;
+    *(th_arg->img_size) = img_size;
 
     pixel_buff_size = img_size.width * img_size.height * PIXEL_COMPONENTS;
     unsigned char buffer [pixel_buff_size];
