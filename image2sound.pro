@@ -29,7 +29,8 @@ SOURCES += \
     extract_rgb.cpp \
     process_jpg.c \
     rgb_to_midi.cpp \
-    midi_files.cpp
+    midi_files.cpp \
+    composer.cpp
 
 HEADERS += \
         image2sound.h \
@@ -37,9 +38,11 @@ HEADERS += \
     process_jpg.h \
     jpeglib.h \
     rgb_to_midi.h \
-    midi_files.h
+    midi_files.h \
+    composer.h
 
-LIBS += -ljpeg
+LIBS += -ljpeg \
+        -lasound
 
 FORMS += \
         image2sound.ui

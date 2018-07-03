@@ -148,7 +148,9 @@ void copy_to_buffer(unsigned char *buffer, int row, unsigned char *data)
 
 void put_scanline_someplace(unsigned char *buffer, int row, FILE *f)
 {
+    static int j = 0;
     int i;
-    for(i = 0; i<row; i++)
+    for(i = 0; i<row; i++, j++)
         fputc(buffer[i], f);
+    //printf(" j is %i %i \n ", j, row);
 }

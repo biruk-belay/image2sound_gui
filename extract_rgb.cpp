@@ -40,6 +40,7 @@ void *extract_rgb(void *arg)
 
    extract_rgb_from_jpg(fname, buff_ptr);
     qDebug() << "EXTRAACT RGB: extracted the rgb, doing transpose " << endl;
+//
 
     //Transpose the buffer
     for(i = 0; i < img_size.width * 3; i+=3)

@@ -3,6 +3,7 @@
 #include "extract_rgb.h"
 #include "rgb_to_midi.h"
 #include "midi_files.h"
+#include "composer.h"
 
 #include <QFileDialog>
 #include <QDebug>
@@ -18,7 +19,7 @@ image2sound::image2sound(QWidget *parent) :
     init_mux();
     init_cond();
 
-    image2sound::trig_pts = {50,0,0,0};
+    image2sound::trig_pts = {50,200, 40,0};
 
     connect(ui->Load_button, SIGNAL(released()), this, SLOT(load_button_pressed()));
     connect(ui->Play_button, SIGNAL(released()), this, SLOT(play_button_pressed()));
@@ -45,9 +46,6 @@ void image2sound::load_button_pressed()
     th_args[EXTRACT_RGB].img_size = &img_size_global;
     th_args[EXTRACT_RGB].extra_params = (void *) &imagePath;
 
-    //img_info.filename = &imagePath;
-    //img_info.img_size = &img_size_global;
-
     //fill task parameters
     fill_task_param(EXTRACT_RGB, EXTRACT_RGB, (void *) &th_args[EXTRACT_RGB], 0, 0, 0, 20);
 
@@ -58,7 +56,7 @@ void image2sound::load_button_pressed()
 
     sch_par.__sched_priority = tp[EXTRACT_RGB].priority;
     pthread_attr_setschedparam(attr_ptr, &sch_par);
-    //pthread_attr_setstack(&attr[EXTRACT_RGB], &stack, 65536000);
+
     /*if image path fails to load (i.e. the image is not updated) restore the previous path
      *  else process the newly loaded image with a thread */
     if(imagePath == "")
@@ -89,19 +87,55 @@ void image2sound::load_button_pressed()
 void image2sound::play_button_pressed()
 {
     int status, i;
-    int thread_number[] = {THREAD1, THREAD2, THREAD3, THREAD4, RGB_TO_MIDI};
+    int thread_number[] = {THREAD1, THREAD2, THREAD3, THREAD4, COMPOSER_th_1,
+                           COMPOSER_th_2, COMPOSER_th_3, COMPOSER_th_4, ALSA_THREAD, RGB_TO_MIDI};
+    int thread_priority[] = {20, 20, 20, 20, 30, 20, 20, 20, 20, 20};
+    int thread_period[]   = {250, 250, 250, 250, 200, 250, 250, 250, 250, 50};
 
     qDebug() << "PLAY BUTTON PRESSED: img_size_global" << img_size_global.height << endl;
 
-    for(i = 0; i < 5; i++) {
+     status = open_seq(&seq_handler, &alsa_input_port, alsa_output_port);
+     if(status != 0)
+         qDebug() << "error creating sequencer" << endl;
 
-        fill_task_param(thread_number[i], thread_number[i], (void*) &th_args[thread_number[i]], 0, 10, 0, 20);
+    for(i = 0; i < TOTAL_THREADS - 1; i++) {
+
+        fill_task_param(thread_number[i], thread_number[i],
+                        (void*) &th_args[thread_number[i]], 0,
+                       thread_period[i], 0, thread_priority[i]);
 
         th_args[thread_number[i]].task_parameter = &tp[thread_number[i]];
         th_args[thread_number[i]].img_size = &img_size_global;
+
         if(thread_number[i] == THREAD1 || thread_number[i] == THREAD2 ||
-                thread_number[i] == THREAD3 || thread_number[i] == THREAD4 )
+                thread_number[i] == THREAD3 || thread_number[i] == THREAD4)
             th_args[thread_number[i]].extra_params = (void *) &comp_buff[thread_number[i]];
+
+        if(thread_number[i] == COMPOSER_th_1 || thread_number[i] == COMPOSER_th_2 ||
+                thread_number[i] == COMPOSER_th_3 || thread_number[i] == COMPOSER_th_4 ||
+                thread_number[i] == ALSA_THREAD) {
+
+            switch (thread_number[i]) {
+
+            case COMPOSER_th_1 :
+                midi_addr = {seq_handler, alsa_output_port[0]};
+                break;
+            case COMPOSER_th_2 :
+                midi_addr = {seq_handler, alsa_output_port[1]};
+                break;
+            case COMPOSER_th_3 :
+                midi_addr = {seq_handler, alsa_output_port[2]};
+                break;
+            case COMPOSER_th_4 :
+                midi_addr = {seq_handler, alsa_output_port[3]};
+                break;
+            case ALSA_THREAD :
+                midi_addr = {seq_handler, alsa_output_port[4]};
+                break;
+            }
+
+            th_args[thread_number[i]].extra_params = (void *) &midi_addr;
+        }
 
         pthread_attr_init(&attr[thread_number[i]]);
         pthread_attr_setschedpolicy(&attr[thread_number[i]], SCHED_FIFO);\
@@ -109,47 +143,41 @@ void image2sound::play_button_pressed()
         pthread_attr_setschedparam(&attr[thread_number[i]], &sch_par);
 
     }
-    //Fill the task parameters for the thread which converts RGB to MIDI
-/*
-    th_args[RGB_TO_MIDI].task_parameter = &tp[RGB_TO_MIDI];
-    th_args[RGB_TO_MIDI].img_size = &img_size_global;
-
-    fill_task_param(RGB_TO_MIDI, RGB_TO_MIDI, (void*) &th_args[RGB_TO_MIDI], 0, 10, 0, 20);
-
-    pthread_attr_init(&attr[RGB_TO_MIDI]);
-    pthread_attr_setschedpolicy(&attr[RGB_TO_MIDI], SCHED_FIFO);
-    sch_par.__sched_priority = tp[RGB_TO_MIDI].priority;
-    pthread_attr_setschedparam(&attr[RGB_TO_MIDI], &sch_par);
 
     //Add a way to safely manage multiple presses of the play button
-  */
     status = pthread_create(&threads[RGB_TO_MIDI], &attr[RGB_TO_MIDI],
                             rgb_to_midi, (void *) tp[RGB_TO_MIDI].arg);
     if(status != 0)
         qDebug() << "PLAY BUTTON PRESSED: thread not created" << status << endl;
-
-    /*Initialize attributes & fill the task parameters for the threads which
-     * interact with the MIDI thread
-    */
-    //for loop here later
-    /*th_args[first_thread].img_size = &img_size_global;
-    //array of structure which contains vectors to buffer MIDI values for the MIDI thread
-    th_args[first_thread].extra_params = (void *) &comp_buff[first_thread];
-    th_args[first_thread].task_parameter = &tp[THREAD1];
-
-    fill_task_param(THREAD1, first_thread, (void *) &th_args[first_thread], 0, 25, 0, 18);
-    //Initialize the attributes and task parameters for the remaining threads
-    pthread_attr_init(&attr[THREAD1]);
-    pthread_attr_setschedpolicy(&attr[THREAD1], SCHED_FIFO);
-    sch_par.__sched_priority = tp[THREAD1].priority;
-    pthread_attr_setschedparam(&attr[THREAD1], &sch_par);
-*/
     status = pthread_create(&threads[THREAD1], &attr[THREAD1],
                             func, (void *) tp[THREAD1].arg);
     if(status != 0)
         qDebug() << "PLAY BUTTON PRESSED: thread not created" << status << endl;
 
-    qDebug() << "period in main" << tp[RGB_TO_MIDI].period << endl;
+    status = pthread_create(&threads[THREAD2], &attr[THREAD2],
+                            func, (void *) tp[THREAD2].arg);
+
+
+
+    status = pthread_create(&threads[COMPOSER_th_1], &attr[COMPOSER_th_1],
+                           composer, (void *) tp[COMPOSER_th_1].arg);
+    if(status != 0)
+        qDebug() << "PLAY BUTTON PRESSED: thread not created" << status << endl;
+
+    status = pthread_create(&threads[COMPOSER_th_2], &attr[COMPOSER_th_2],
+                           composer, (void *) tp[COMPOSER_th_2].arg);
+
+    //status = pthread_create(&threads[COMPOSER_th_3], &attr[COMPOSER_th_3],
+      //                     composer, (void *) tp[COMPOSER_th_3].arg);
+
+    if(status != 0)
+        qDebug() << "PLAY BUTTON PRESSED: thread not created" << status << endl;
+
+    status = pthread_create(&threads[ALSA_THREAD], &attr[ALSA_THREAD],
+                            alsa_handler, (void *) tp[ALSA_THREAD].arg);
+    if(status != 0)
+        qDebug() << "PLAY BUTTON PRESSED: thread not created" << status << endl;
+
 }
 
 void image2sound::stop_button_pressed()
@@ -181,4 +209,41 @@ void image2sound::init_cond()
     int i;
     for(i = 0; i < NUM_THREADS; i++)
         pthread_cond_init(&image2sound::sync_cond[i], NULL);
+}
+
+/* Open ALSA sequencer wit num_in writeable ports and num_out readable ports. */
+/* The sequencer handle and the port IDs are returned.                        */
+int image2sound::open_seq(snd_seq_t **seq_handle, int *in_ports, int *out_ports)
+{
+
+    int i;
+    char portname[64];
+
+    if (snd_seq_open(seq_handle, "default", SND_SEQ_OPEN_DUPLEX, 0) < 0) {
+        qDebug() << " error opening sequencer" << endl;
+        return(-1);
+    }
+
+    snd_seq_set_client_name(*seq_handle, "MIDI Router");
+
+    for (i = 0; i < ALSA_INPUT_PORTS; i++) {
+        sprintf(portname, "MIDI Router IN %d", i);
+        if ((in_ports[i] = snd_seq_create_simple_port(*seq_handle, portname,
+              SND_SEQ_PORT_CAP_WRITE|SND_SEQ_PORT_CAP_SUBS_WRITE,
+              SND_SEQ_PORT_TYPE_APPLICATION)) < 0) {
+            qDebug() << "error creating ports on sequencer" << endl;
+            return(-1);
+        }
+    }
+
+    for (i = 0; i < ALSA_OUTPUT_PORTS; i++) {
+        sprintf(portname, "MIDI Router IN %d", i);
+        if ((out_ports[i] = snd_seq_create_simple_port(*seq_handle, portname,
+              SND_SEQ_PORT_CAP_READ|SND_SEQ_PORT_CAP_SUBS_READ,
+              SND_SEQ_PORT_TYPE_APPLICATION)) < 0) {
+            qDebug() << "error creating ports on sequencer" << endl;
+            return(-1);
+        }
+    }
+    return(0);
 }

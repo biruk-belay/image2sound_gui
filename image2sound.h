@@ -6,11 +6,15 @@
 #include <pthread.h>
 #include <vector>
 #include <semaphore.h>
+#include <alsa/asoundlib.h>
 
 #include "extract_rgb.h"
 
+
 #define NUM_THREADS 4
-#define TOTAL_THREADS 7
+#define TOTAL_THREADS 11
+#define ALSA_INPUT_PORTS 1
+#define ALSA_OUTPUT_PORTS 5
 
 #define fill_task_param(threadId, id, arg, wcet, period, deadline, priority) \
                     tp[threadId] = {id, arg, wcet, period, deadline, priority, 0, 0, 0, 0};
@@ -19,16 +23,14 @@ enum Thread_id {
     THREAD2,
     THREAD3,
     THREAD4,
+    COMPOSER_th_1,
+    COMPOSER_th_2,
+    COMPOSER_th_3,
+    COMPOSER_th_4,
+    ALSA_THREAD,
     RGB_TO_MIDI,
     EXTRACT_RGB,
-    COMPOSER_t,
 };
-
-#define    first_thread      0
-#define    second_thread     1
-#define    third_thread      2
-#define    fourth_thread     3
-#define    COMPOSER     4
 
 typedef struct
 {
@@ -54,11 +56,6 @@ typedef struct {
 }midi_data;
 
 typedef struct {
-    QString *filename;
-    image_size *img_size;
-}image_info;
-
-typedef struct {
     std::vector<midi_data> buffer;
 }composer_buffer;
 
@@ -68,6 +65,11 @@ struct trigger_points {
     int thread_3_trig;
     int thread_4_trig;
 };
+
+typedef struct {
+    snd_seq_t *seq_handler;
+    int port;
+}midi_address;
 
 namespace Ui {
 class image2sound;
@@ -86,15 +88,14 @@ public:
     pthread_attr_t attr[TOTAL_THREADS];
     thread_arg th_args[TOTAL_THREADS];
 
-
     struct sched_param sch_par;
-    static std::vector <float> rgb_vector;
+    static std::vector <unsigned char> rgb_vector;
     static std::vector<midi_data> midi_vector;
-    static composer_buffer comp_buff[NUM_THREADS];
 
-    static pthread_mutex_t sync_mutex[NUM_THREADS];
-    static pthread_cond_t  sync_cond[NUM_THREADS];
-    static bool is_triggered[NUM_THREADS];
+    static composer_buffer comp_buff[NUM_THREADS];
+    static pthread_mutex_t sync_mutex[TOTAL_THREADS - 2];
+    static pthread_cond_t  sync_cond[TOTAL_THREADS - 2];
+    static bool is_triggered[TOTAL_THREADS - 2];
     static struct trigger_points trig_pts;
 
     QString imagePath;
@@ -104,10 +105,17 @@ public:
     void init_mux();
     void init_cond();
 
+    //Variables for alsa
+    snd_seq_t *seq_handler;
+    int alsa_output_port[NUM_THREADS + 1];
+    int alsa_input_port;
+    midi_address midi_addr;
+
 private:
     Ui::image2sound *ui;
     QPixmap image;
     QGraphicsScene *scene;
+    int open_seq(snd_seq_t **seq_handle, int *in_ports, int *out_ports);
 
 private slots:
     void load_button_pressed();
