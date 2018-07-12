@@ -13,18 +13,33 @@
 
 void time_add_ms(struct timespec *t, int ms);
 int time_cmp(struct timespec t1, struct timespec t2);
-void check_deadline_miss(struct timespec t1);
+void check_deadline_miss(struct timespec t1, int task_id);
+
+#define  OCTAVE 12
+
+
+enum key_chords{
+    CMINOR,
+    CMAJOR,
+    DDORIAN,
+};
+
+typedef struct {
+    key_chords key;
+    int scale_1;
+    int scale_2;
+}keys;
 
 enum MIDI {
-    MIDI_1 = 64,      //80Hz
-    MIDI_2,           //240HZ
+    MIDI_1 = 71,
+    MIDI_2,
     MIDI_3,
     MIDI_4,
     MIDI_5,
     MIDI_6,
     MIDI_7,
     MIDI_8,
-    MIDI_9,
+    MIDI_9 ,
     MIDI_10,
     MIDI_11,
     MIDI_12,

@@ -30,7 +30,8 @@ SOURCES += \
     process_jpg.c \
     rgb_to_midi.cpp \
     midi_files.cpp \
-    composer.cpp
+    composer.cpp \
+    monitor.cpp
 
 HEADERS += \
         image2sound.h \
@@ -39,7 +40,8 @@ HEADERS += \
     jpeglib.h \
     rgb_to_midi.h \
     midi_files.h \
-    composer.h
+    composer.h \
+    monitor.h
 
 LIBS += -ljpeg \
         -lasound
