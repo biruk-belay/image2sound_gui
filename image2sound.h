@@ -17,6 +17,10 @@
 #define TOTAL_THREADS 13
 #define ALSA_INPUT_PORTS 1
 #define ALSA_OUTPUT_PORTS 5
+#define CHAN_1 1
+#define CHAN_2 2
+#define CHAN_3 3
+#define CHAN_4 4
 
 #define fill_task_param(threadId, id, arg, wcet, period, deadline, priority) \
                     tp[threadId] = {id, arg, wcet, period, deadline, priority, 0, 0, 0, 0};
@@ -40,6 +44,15 @@ enum tempo {
    QUARTER  = 8,
    EIGTH    = 16,
    SIXTINTH = 32,
+};
+
+enum instrument {
+    BASS,
+    PIANO,
+    GUITAR,
+    SAX,
+    DRUM,
+    VIOLIN,
 };
 
 typedef struct {
@@ -88,6 +101,7 @@ typedef struct {
     midi_address *midi_addr;
     enum tempo type;
     int *sequence;
+    enum instrument instr;
 }synthesizer_data;
 
 typedef struct {
@@ -97,7 +111,7 @@ typedef struct {
 
 typedef struct {
     int quarter[QUARTER];
-    int eigth{EIGTH};
+    int eigth[EIGTH];
     int sixtinth[SIXTINTH];
 }rhythm;
 
@@ -160,13 +174,13 @@ public:
     static int frame_width, frame_height;
 
     //Variables used by ALSA
-    snd_seq_t *seq_handler;
+    static snd_seq_t *seq_handler;
     int alsa_output_port[NUM_THREADS + 1];
     int alsa_input_port;
     static midi_address midi_addr [NUM_THREADS + 1];
     static synthesizer_data synth_data[NUM_THREADS + 1];
     static rhythm rhytm1[NUM_THREADS];
-    static void generate_rhythm(int *rhythm, enum tempo type);
+    static void generate_rhythm(int *rhythm, enum tempo type, enum instrument instr);
 
 
 

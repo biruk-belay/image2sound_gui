@@ -9,10 +9,10 @@
 #include <QDebug>
 #include <iostream>
 
-#define T_QUARTER 150
-#define T_8th T_QUARTER >> 1
+#define T_QUARTER           150
+#define T_8th T_QUARTER >>  1
 #define T_16th T_QUARTER >> 2
-#define T_min T_QUARTER >> 1
+#define T_min T_QUARTER >>  3
 
 image2sound::image2sound(QWidget *parent) :
     QMainWindow(parent),
@@ -128,30 +128,10 @@ void image2sound::play_button_pressed()
                          ALSA_THREAD, RGB_TO_MIDI, MONITOR_THREAD,
                          UPDATE_SCENE};
 
-   /* int baseline[1][QUARTER] = {{0,{0, 1, 1, 0, 1, 0, 0, 1}},
-                               {1, {1, 0, 0, 1, 1, 1, 1, 0}},
-                               {2, {0, 1, 0, 0, 1, 0, 1, 1}},
-                               {3, {1, 0, 1, 1, 0, 1, 0, 0}},
-                               {4, {1, 1, 0, 1, 0, 0, 1, 0}},
-                               {5, {1, 0, 0, 1, 1, 0, 1, 0}}
-                              };
-/*
-    int array_rhythm_2 [] = {1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0,
-                           0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0 };
-
-    int array_rhythm_3 [] = {1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0,
-                           0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0 };
-
-    int array_rhythm_4 [] = {0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0,
-                           0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1 };
-
-    int array_rhythm_3 [] = {1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0,
-                           0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0 };
-
-*/
-    int thread_priority[] = {20, 20, 20, 20, 30, 20, 20, 20, 20, 20, 20, 20};
-    int thread_period[]   = {T_min, T_min, T_min, T_min, T_8th, T_8th, T_16th, T_8th,
-                             50, 10, 1000, 1000};
+    int thread_priority[] = {30, 30, 30, 30, 20, 20, 20, 20, 20, 20, 20, 20};
+    int thread_period[]   = {T_QUARTER, T_8th, T_16th, T_8th,
+                             T_QUARTER , T_8th, T_16th, T_8th,
+                             T_min, T_min, 1000, 1000};
 
     qDebug() << "PLAY BUTTON PRESSED: img_size_global" << img_size_global.height << endl;
 
@@ -185,25 +165,35 @@ void image2sound::play_button_pressed()
             switch (thread_number[i]) {
 
             case COMPOSER_th_1 :
-                generate_rhythm(rhytm1[0].quarter, QUARTER);
-                midi_addr[0] = {seq_handler, alsa_output_port[0], 1};
+                generate_rhythm(rhytm1[0].quarter, QUARTER, BASS);
+                midi_addr[0] = {seq_handler, alsa_output_port[0], CHAN_1};
                 synth_data[0].midi_addr = &midi_addr[0];
                 synth_data[0].sequence  = rhytm1[0].quarter;
                 synth_data[0].type = QUARTER;
+                synth_data[0].instr = BASS;
                 th_args[thread_number[i]].extra_params = (void *) &synth_data[0];
                 break;
+
             case COMPOSER_th_2 :
-                generate_rhythm(rhytm1[1].quarter, EIGTH);
-                midi_addr[1] = {seq_handler, alsa_output_port[1], 2};
+                generate_rhythm(rhytm1[1].eigth, EIGTH, PIANO);
+                midi_addr[1] = {seq_handler, alsa_output_port[1], CHAN_2};
                 synth_data[1].midi_addr = &midi_addr[1];
-                synth_data[1].sequence  = rhytm1[1].quarter;
+                synth_data[1].sequence  = rhytm1[1].eigth;
                 synth_data[1].type = EIGTH;
+                synth_data[1].instr = PIANO;
                 th_args[thread_number[i]].extra_params = (void *) &synth_data[1];
                 break;
+
             case COMPOSER_th_3 :
-                midi_addr[2] = {seq_handler, alsa_output_port[2]};
-                th_args[thread_number[i]].extra_params = (void *) &midi_addr[2];
+                generate_rhythm(rhytm1[2].sixtinth, SIXTINTH, GUITAR);
+                midi_addr[2] = {seq_handler, alsa_output_port[2], CHAN_3};
+                synth_data[2].midi_addr = &midi_addr[2];
+                synth_data[2].sequence = rhytm1[2].sixtinth;
+                synth_data[2].type =SIXTINTH;
+                synth_data[2].instr = GUITAR;
+                th_args[thread_number[i]].extra_params = (void *) &synth_data[2];
                 break;
+
             case COMPOSER_th_4 :
                 midi_addr[3] = {seq_handler, alsa_output_port[3]};
                 th_args[thread_number[i]].extra_params = (void *) &midi_addr[3];
@@ -245,10 +235,10 @@ void image2sound::play_button_pressed()
     }
 
 
-        if(!tsk_state[THREAD2].is_active) {
-            status = pthread_create(&threads[THREAD2], &attr[THREAD2],
-                                    func, (void *) tp[THREAD2].arg);
-            if(status != 0)
+    if(!tsk_state[THREAD2].is_active) {
+         status = pthread_create(&threads[THREAD2], &attr[THREAD2],
+                             func, (void *) tp[THREAD2].arg);
+         if(status != 0)
                 qDebug() << "PLAY BUTTON PRESSED: copy_to_buff thread not created" << status << endl;
         }
 
@@ -261,6 +251,21 @@ void image2sound::play_button_pressed()
 
     }
 
+    if(!tsk_state[THREAD3].is_active) {
+         status = pthread_create(&threads[THREAD3], &attr[THREAD3],
+                             func, (void *) tp[THREAD3].arg);
+         if(status != 0)
+                qDebug() << "PLAY BUTTON PRESSED: copy_to_buff thread not created" << status << endl;
+        }
+
+    if(!tsk_state[COMPOSER_th_3].is_active) {
+        status = pthread_create(&threads[COMPOSER_th_3], &attr[COMPOSER_th_3],
+                           synthesizer, (void *) tp[COMPOSER_th_3].arg);
+
+        if(status != 0)
+            qDebug() << "PLAY BUTTON PRESSED: thread not created" << status << endl;
+
+    }
 
     if(!tsk_state[ALSA_THREAD].is_active) {
         status = pthread_create(&threads[ALSA_THREAD], &attr[ALSA_THREAD],
@@ -268,12 +273,12 @@ void image2sound::play_button_pressed()
         if(status != 0)
             qDebug() << "PLAY BUTTON PRESSED: alsa thread not created" << status << endl;
     }
-/*
+
     status = pthread_create(&threads[MONITOR_THREAD], &attr[MONITOR_THREAD],
                             monitor, (void *) tp[MONITOR_THREAD].arg);
     if(status != 0)
         qDebug() << "PLAY BUTTON PRESSED: monitor thread not created" << status << endl;
-*/
+
 
 }
 
@@ -326,15 +331,18 @@ void image2sound::init_cond()
 
 int image2sound::open_seq(snd_seq_t **seq_handle, int *in_ports, int *out_ports)
 {
-
     int i;
     char portname[64];
 
+    //open alsa sequencer
     if (snd_seq_open(seq_handle, "default", SND_SEQ_OPEN_DUPLEX, 0) < 0) {
         qDebug() << " error opening sequencer" << endl;
         return(-1);
     }
 
+    assert(seq_handle != NULL);
+
+    //There are 5 output ports and 1 input port
     snd_seq_set_client_name(*seq_handle, "Image2Sound");
 
     for (i = 0; i < ALSA_INPUT_PORTS; i++) {
@@ -362,6 +370,7 @@ int image2sound::open_seq(snd_seq_t **seq_handle, int *in_ports, int *out_ports)
     return(0);
 }
 
+//initialize task state
 void image2sound::init_task_state()
 {
     int i;
@@ -408,7 +417,7 @@ void image2sound::update_scene()
     }
 }
 
-void image2sound::generate_rhythm(int *rhythm, enum tempo type)
+void image2sound::generate_rhythm(int *rhythm, enum tempo type, enum instrument instr)
 {
     int i;
     int count = 0;
@@ -422,7 +431,7 @@ void image2sound::generate_rhythm(int *rhythm, enum tempo type)
                 if(array[i] == 1)
                     count++;
             }
-        } while(count < type/3);
+        } while(instr == PIANO ? count < type/2 : count < type/3);
 
         for(i = 0; i < type; i++) {
             *(rhythm + i) = array[i];

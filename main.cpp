@@ -20,6 +20,7 @@ cancel_thread image2sound::cancel_th[TOTAL_THREADS];
 rhythm image2sound::rhytm1[NUM_THREADS];
 midi_address image2sound::midi_addr [NUM_THREADS + 1];
 synthesizer_data image2sound::synth_data[NUM_THREADS + 1];
+snd_seq_t *image2sound::seq_handler;
 
 //int image2sound::thread_number[TOTAL_THREADS - 1];
 
